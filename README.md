@@ -210,10 +210,55 @@ To this aim:
 >**NOTE!** This IP address is the public IP address of the AP-LIS.      
 3. set the path to your QuPath installation (variable *paquo_qupath_dir* - line 399 in server_client_system.py)
 
-## How to test the integration framework
-To test the integration framework, assume that the system on which DL model deployment is performed acts as the AI-DSS and the system sending HL7 messages to the AI-DSS acts as the AP-LIS. This can be simualted using [Hapi Test Panel](https://hapifhir.github.io/hapi-hl7v2/hapi-testpanel/install.html) that can be downloaded from [here](https://sourceforge.net/projects/hl7api/files/hapi-testpanel/2.0.1/). Hapi Test Panel is as a comprehensive message editor, transmitter, and receiver designed to send, receive, and edit HL7 messages for testing purposes by allowing both transmitting HL7 messages to a specified server and listening for incoming messages. Information on Hapi Test Panel usage can be found in the official [documentation](https://hapifhir.github.io/hapi-hl7v2/hapi-testpanel/install.html).
+
+### Run the main script
+Once the aforementioned steps have been performed, you can initiate the integration framework and start listening for incoming HL7 messages by running:
+```bash
+python /path/to/IntegrationFramework_APLIS/src/server_client_system.py
+```
+
+## How to test the integration framework 
+To test the integration framework, assume that the system on which DL model deployment is performed acts as the AI-DSS and the system sending HL7 messages to the AI-DSS acts as the AP-LIS. This can be simualted using [Hapi Test Panel](https://hapifhir.github.io/hapi-hl7v2/hapi-testpanel/install.html) that can be downloaded from [here](https://sourceforge.net/projects/hl7api/files/hapi-testpanel/2.0.1/). HAPI Test Panel is as a comprehensive message editor, transmitter, and receiver designed to send, receive, and edit HL7 messages for testing purposes by allowing both transmitting HL7 messages to a specified server and listening for incoming messages. Information on Hapi Test Panel usage can be found in the official [documentation](https://hapifhir.github.io/hapi-hl7v2/hapi-testpanel/install.html).
 If HAPI Test Panel is installed on the same computer used to run the integration framework, then *hs=hlis*=('localhost' OR '127.0.0.1'). 
-The images below provide an example on how to set-up Hapi Test Panel basing on the IP addresses and ports defined in the server_client_system.py script. 
+
+The images below provide an example on how to make the integration framework work with the help of Hapi Test Panel after you correctly set-up IP addresses and ports in the server_client_system.py script. Note! This example referes to a scenario where HL7 messages are sent from the same computer on which DL models are deployed, i.e., **AI-DSS and AP-LIS are on the same computer**.  
+
+- *hs*, *ps*, *hlis*, and *plis* variables provided in the main script server_client_system.py:
+  
+<p align="left">
+  <img src="https://github.com/MiriamAng/IntegrationFramework_APLIS/blob/main/docs/Screenshot_1.JPG" width="800" />
+</p>
+
+- Set in HAPI Test Panel the correct IP addresses and ports for both the "Sender connection" and the "Receiving connection" using the variables set in the python script as follows:
+<p align="center">
+  <img src="https://github.com/MiriamAng/IntegrationFramework_APLIS/blob/main/docs/Screenshot_2.JPG" width="800" />
+</p>
+
+
+<p align="center">
+  <img src="https://github.com/MiriamAng/IntegrationFramework_APLIS/blob/main/docs/Screenshot_3.JPG" width="800" />
+</p>
+
+- Activate the conda environment of the integration framework and run:
+```bash
+python /path/to/IntegrationFramework_APLIS/src/server_client_system.py
+```
+You should see printed on the terminal:
+```bash
+......listening for connections on 127.0.0.1:21111
+```
+- From HAPI Test Panel click on AI-DSS from the tab "Sending Connections" and then click on the play button
+
+If the connection between AI-DSS and AP-LIS was correctly established then you should see printed on the terminal:
+```bash
+Connected to: ('127.0.0.1', A_PORT_NUMBER)
+```
+- From HAPI Test Panel click on AP-LIS from the tab "Receiving Connections" and then click on the play button
+
+- Once both sending and receiving connections are activated, you can send the HL7 message to the AI-DSS by providing the input the correct model for deployment and the correct path to the slide to analyze:
+<p align="center">
+  <img src="https://github.com/MiriamAng/IntegrationFramework_APLIS/blob/main/docs/Screenshot_4.JPG" width="800" />
+</p>
 
 ## References
 1) Kaczmarzyk, J. R. et al. Open and reusable deep learning for pathology with WSInfer and QuPath. NPJ Precis. Oncol. 8, 9 (2024).
