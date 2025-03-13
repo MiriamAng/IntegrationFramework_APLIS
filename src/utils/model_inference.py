@@ -19,7 +19,8 @@ from utils import create_qupath_proj
 # Automatically reset the style to normal after each print statement
 init(autoreset=True)
 
-def run_inference(slide_id : str,
+def run_inference(vendor : str,
+                  slide_id : str,
                   spm_4_2 : str,
                   slides_archive : str | Path,
                   wdir : str | Path,
@@ -27,21 +28,29 @@ def run_inference(slide_id : str,
 
     """
     This function runs deep-learning model deployment with the WSInfer open-source toolboxe
-
+    :param vendor: slide scanner manufacturer, i.e. 3DHistech or other
     :param slide_id: slide identifier
     :param spm_4_2: name of the deepl-learning model as indicated in the SPM field 4.2 of the input OML^O33 HL7 message
     :param slides_archive: path to the slides archive
     :param wdir: path to the working directory
+    :param paquo_qupath_dir: path to the QuPath installation used for paquo
     """
 
-    mrxs_path_archive = Path(rf"{slides_archive}/{slide_id}.mrxs")
-    if os.path.isfile(mrxs_path_archive):
-        pass
+    if vendor == "3DHistech":
+        slide_no_ext = slide_id
+        # Create the correspondent mrxs file in the slide archive folder.
+        # This will then be used to create the QuPath Project
+        mrxs_path_archive = Path(rf"{slides_archive}/{slide_id}.mrxs")
+        if os.path.isfile(mrxs_path_archive):
+            pass
+        else:
+            open(mrxs_path_archive, "x").close()
+
     else:
-        open(mrxs_path_archive, "x").close()
+        slide_no_ext = os.path.splitext(slide_id)[0]
 
     # Define the temporary slide directory where to store each new analyzed slide
-    tmp_slidedir = Path(rf"{wdir}/tmp_slides/{slide_id}")
+    tmp_slidedir = Path(rf"{wdir}/tmp_slides/{slide_no_ext}")
 
     # Check if tmp_slidedir exists, and if it does not exist create the folder
     if not os.path.exists(tmp_slidedir):
@@ -61,6 +70,7 @@ def run_inference(slide_id : str,
         else:
             open(mrxs_path, "x").close()
             print(rf"File {slide_id}.mrxs is being created.")
+
     else:
         # If the folder already exists, it means that the slide has been previously analyzed with other algorithms, and thus also the mrxs file exists
         print(f"Slide {slide_id} already exists...Skipping copy of slide under {tmp_slidedir}")
@@ -81,7 +91,7 @@ def run_inference(slide_id : str,
     model_name = df.loc[idx, 'Model_Name'].to_string(index=False)
 
     # Create the results directory storing results for a given model deployed on a given slide
-    tmp_resdir = Path(rf"{wdir}/results_inference/{slide_id}/{model_name}")
+    tmp_resdir = Path(rf"{wdir}/results_inference/{slide_no_ext}/{model_name}")
     if not os.path.exists(tmp_resdir):
         os.makedirs(tmp_resdir)
 
@@ -143,11 +153,11 @@ def run_inference(slide_id : str,
         if visualization == "measurement_map":
             print(f"{Fore.MAGENTA}*" * 100)
             print(f"{Fore.MAGENTA}Creating measurement map for slide: {slide_id}")
-            create_qupath_proj.create_measurement_map(slide_id, model_resdir, slides_archive, qupathdir, class_names)
+            create_qupath_proj.create_measurement_map(vendor, slide_id, model_resdir, slides_archive, qupathdir, class_names)
         elif visualization == 'color_map':
             print(f"{Fore.MAGENTA}*" * 100)
             print(f"{Fore.MAGENTA}Creating color map for slide: {slide_id}")
-            create_qupath_proj.create_color_map(slide_id, model_resdir, slides_archive, qupathdir)
+            create_qupath_proj.create_color_map(vendor, slide_id, model_resdir, slides_archive, qupathdir)
     else:
         print(f"Toolbox {toolbox} not available")
                 

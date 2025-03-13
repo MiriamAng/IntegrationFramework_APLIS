@@ -7,6 +7,8 @@ Author: Miriam Angeloni
 E-Mail: miriam.angeloni@uk-erlangen.de
 """
 
+import os
+
 from pathlib import Path
 from hl7apy.parser import parse_message
 from hl7apy.exceptions import UnsupportedVersion
@@ -23,9 +25,15 @@ def extract_slide_id(msg_input_dict: dict) -> str:
         
     slide_path = Path(rf"{str_slide_path}")
 
+    # If the path to the slide is a directory, then it means that it was scanned with a 3DHistech scanner
+    if os.path.isdir(slide_path):
+        vendor = '3DHistech'
+    else:
+        vendor = 'Other'
+
     slide_id = slide_path.name
     
-    return slide_id
+    return vendor, slide_id
         
 
 def extract_msg_info(hl7_input: str):
@@ -65,6 +73,6 @@ def extract_msg_info(hl7_input: str):
         msg_input_dict2[f"{segment_name}"] = segment.value
         
     # Extract the slide identifier
-    slide_id = extract_slide_id(msg_input_dict)
+    vendor, slide_id = extract_slide_id(msg_input_dict)
 
-    return dl_model, slide_id, msg_input, msg_input_dict, msg_input_dict2
+    return vendor, dl_model, slide_id, msg_input, msg_input_dict, msg_input_dict2

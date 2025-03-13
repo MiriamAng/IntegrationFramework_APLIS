@@ -188,7 +188,7 @@ def msg_worker(slides_archive: str | Path,
         print("Reading Input Message........")
 
         try:
-            cod_model, slide_id, msg_input, msg_input_dict, msg_input_dict2 = read_input_msg.extract_msg_info(msg)
+            vendor, cod_model, slide_id, msg_input, msg_input_dict, msg_input_dict2 = read_input_msg.extract_msg_info(msg)
 
         except Exception as e:
             print(f"Error in extracting info from the input message. \n{e} for message {msg}")
@@ -213,7 +213,7 @@ def msg_worker(slides_archive: str | Path,
 
         # Run model inference
         try:
-            model_name, pred_label, pred_score = model_inference.run_inference(slide_id, cod_model,
+            model_name, pred_label, pred_score = model_inference.run_inference(vendor, slide_id, cod_model,
                                                                                      slides_archive, wdir, paquo_qupath_dir)
         except Exception as e:
             print(f"Error processing message. \n{e} for slide ID {slide_id}")
@@ -243,7 +243,7 @@ def msg_worker(slides_archive: str | Path,
 
         # Create the output OUL^R21 HL7 message
         for _ in tqdm(range(100), desc="Creating Output Message"):
-            oul_r21_msg = create_output_msg.create_msg(wdir, slide_id, msg_input, msg_input_dict,
+            oul_r21_msg = create_output_msg.create_msg(vendor, wdir, slide_id, msg_input, msg_input_dict,
                                                              msg_input_dict2, model_name,
                                                              pred_label, pred_score)
             time.sleep(0.02)

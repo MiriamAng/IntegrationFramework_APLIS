@@ -140,7 +140,8 @@ def crate_points(score: float,
         image.hierarchy.add_detection(points, path_class)
 
 
-def create_density_map(slide_id: str,
+def create_density_map(vendor: str,
+                       slide_id: str,
                        res_dl_dir: str | Path,
                        slides_dir: str | Path,
                        output_dir: str | Path,
@@ -150,6 +151,7 @@ def create_density_map(slide_id: str,
     This function implements the density map visualization in QuPath
     This visualization is particularly useful to visualize predictions from MIL models
 
+    :param vendor: slide scanner manufacturer, i.e. 3DHistech or other
     :param slide_id: slide identifier
     :param res_dl_dir: full path to the folder where results from the DL model deployment are stored
     :param slides_dir: full path to the slides archive folder
@@ -157,6 +159,13 @@ def create_density_map(slide_id: str,
     :param pred_class: class predicted by the DL model
     :param pred_score: prediction score associated with the predicted class
     """
+
+    if vendor == "3DHistech":
+        slide_no_ext = slide_id
+        slide_path = os.path.join(slides_dir, f"{slide_no_ext}.mrxs")
+    else:
+        slide_no_ext = os.path.splitext(slide_id)[0]
+        slide_path = os.path.join(slides_dir, slide_id)
 
     model_original = os.path.basename(os.path.dirname(output_dir)).replace("-", "_")
     
@@ -167,7 +176,7 @@ def create_density_map(slide_id: str,
         model = model_original
     
     # Create a QuPath project folder
-    qupath_proj_dir = Path(output_dir, f"{slide_id}_QuPathProj-{model}")
+    qupath_proj_dir = Path(output_dir, f"{slide_no_ext}_QuPathProj-{model}")
     
     if os.path.exists(qupath_proj_dir):
         print(f"QuPath project already exists. Overwriting the existing directory: {qupath_proj_dir}")
@@ -209,28 +218,16 @@ def create_density_map(slide_id: str,
             
         print(f"Slide being processed: {slide_id}")
         
-        mrxs_path = os.path.join(slides_dir, f"{slide_id}.mrxs")
-        
-        if os.path.isfile(mrxs_path):
-            
-            print(f"File {slide_id}.mrxs already exists.")
-        
-        else:
-            
-            open(mrxs_path, "x").close()
-    
-            print(f"File {slide_id}.mrxs is being created.")
-        
         filepath = os.path.join(res_dl_dir, "model_coords_attscores.csv")
     
         attention_score_df = pd.read_csv(filepath)
         
-        image = Path(f"{mrxs_path}")
+        image = Path(f"{slide_path}")
 
         # Add an image
         entry = qp.add_image(image, image_type=QuPathImageType.BRIGHTFIELD_H_E)
         
-        x_offset, y_offset = calculate_offset(mrxs_path)
+        x_offset, y_offset = calculate_offset(slide_path)
         
         height = int(attention_score_df.iloc[1]["height"])
         
@@ -289,17 +286,27 @@ def create_classes(df):
     return classes, my_classes_and_colors
 
     
-def create_color_map(slide_id: str,
+def create_color_map(vendor: str,
+                       slide_id: str,
                        res_dl_dir: str | Path,
                        slides_dir: str | Path,
                        output_dir: str | Path):
     """
     This function implements the color map visualization in QuPath
 
+    :param vendor: slide scanner manufacturer, i.e. 3DHistech or other
     :param slide_id: slide identifier
     :param res_dl_dir: full path to the folder where results from the DL model deployment are stored
+    :param slides_dir: full path to the slides archive folder
     :param output_dir: full path to the directory storing the QuPath project
     """
+
+    if vendor == "3DHistech":
+        slide_no_ext = slide_id
+        slide_path = os.path.join(slides_dir, f"{slide_no_ext}.mrxs")
+    else:
+        slide_no_ext = os.path.splitext(slide_id)[0]
+        slide_path = os.path.join(slides_dir, slide_id)
 
     model_original = os.path.basename(os.path.dirname(output_dir)).replace("-", "_")
     
@@ -312,7 +319,7 @@ def create_color_map(slide_id: str,
     print(f"{model}")
     
     # Create a QuPath project folder
-    qupath_proj_dir = Path(output_dir, f"{slide_id}_QuPathProj-{model}")
+    qupath_proj_dir = Path(output_dir, f"{slide_no_ext}_QuPathProj-{model}")
     
     if os.path.exists(qupath_proj_dir):
         print(f"QuPath project already exists. Overwriting the existing directory: {qupath_proj_dir}")
@@ -324,13 +331,11 @@ def create_color_map(slide_id: str,
 
     project = Path(f"{qupath_proj_dir}")
     
-    filepath = os.path.join(res_dl_dir, f"{slide_id}.csv")
+    filepath = os.path.join(res_dl_dir, f"{slide_no_ext}.csv")
     
     pred_df = pd.read_csv(filepath)
     
-    mrxs_path = os.path.join(slides_dir, f"{slide_id}.mrxs")
-    
-    x_offset, y_offset = calculate_offset(mrxs_path)
+    x_offset, y_offset = calculate_offset(slide_path)
     
     # Specify the classes to use in the description of a given WSI
     classes, classes_colors = create_classes(pred_df)
@@ -344,7 +349,7 @@ def create_color_map(slide_id: str,
     pred_df.insert(3, "miny_offset", miny_offset[0])
     
     # Save the updated csv file
-    pred_df.to_csv(os.path.join(res_dl_dir, f"{slide_id}_withoffset.csv"))
+    pred_df.to_csv(os.path.join(res_dl_dir, f"{slide_no_ext}_withoffset.csv"))
             
     with QuPathProject(project, mode='a') as qp:
    
@@ -360,17 +365,7 @@ def create_color_map(slide_id: str,
             
         print(f"Slide being processed: {slide_id}")
         
-        if os.path.isfile(mrxs_path):
-            
-            print(f"File {slide_id}.mrxs already exists.")
-        
-        else:
-            
-            open(mrxs_path, "x").close()
-    
-            print(f"File {slide_id}.mrxs is being created.")
-        
-        image = Path(f"{mrxs_path}")
+        image = Path(f"{slide_path}")
         
         # Add an image
         entry = qp.add_image(image, image_type=QuPathImageType.BRIGHTFIELD_H_E)
@@ -411,24 +406,33 @@ def create_color_map(slide_id: str,
     
     print(f"\n\n... Renaming project.qpproj file to {slide_id}-{model}.qpproj")
     oldpath = Path(f"{qupath_proj_dir}", "project.qpproj")
-    newpath = Path(f"{qupath_proj_dir}", f"{slide_id}-{model}.qpproj")
+    newpath = Path(f"{qupath_proj_dir}", f"{slide_no_ext}-{model}.qpproj")
     oldpath.rename(newpath)
 
 
 
-def create_measurement_map(slide_id: str,
+def create_measurement_map(vendor: str,
+                       slide_id: str,
                        res_dl_dir: str | Path,
                        slides_dir: str | Path,
                        output_dir: str | Path,
                        class_names: list):
     """
     This function implements the measurement map visualization in QuPath
-
+    :param vendor: slide scanner manufacturer, i.e. 3DHistech or other
     :param slide_id: slide identifier
     :param res_dl_dir: full path to the folder where results from the DL model deployment are stored
+    :param slides_dir: full path to the slides archive folder
     :param output_dir: full path to the directory storing the QuPath project
     :param class_names: list containing the names of the classes predicted by the deep-learning model
     """
+
+    if vendor == "3DHistech":
+        slide_no_ext = slide_id
+        slide_path = os.path.join(slides_dir, f"{slide_no_ext}.mrxs")
+    else:
+        slide_no_ext = os.path.splitext(slide_id)[0]
+        slide_path = os.path.join(slides_dir, slide_id)
 
     if len(class_names) == 1:
         cl = class_names[0]
@@ -446,7 +450,7 @@ def create_measurement_map(slide_id: str,
         model = model_original
     
     # Create a QuPath project folder
-    qupath_proj_dir = Path(output_dir, f"{slide_id}_QuPathProj-{model}")
+    qupath_proj_dir = Path(output_dir, f"{slide_no_ext}_QuPathProj-{model}")
     
     if os.path.exists(qupath_proj_dir):
         print(f"QuPath project already exists. Overwriting the existing directory: {qupath_proj_dir}")
@@ -458,13 +462,11 @@ def create_measurement_map(slide_id: str,
 
     project = Path(rf"{qupath_proj_dir}")
     
-    filepath = os.path.join(res_dl_dir, f"{slide_id}.csv")
+    filepath = os.path.join(res_dl_dir, f"{slide_no_ext}.csv")
     
     pred_df = pd.read_csv(filepath)
     
-    mrxs_path = os.path.join(slides_dir, f"{slide_id}.mrxs")
-    
-    x_offset, y_offset = calculate_offset(mrxs_path)
+    x_offset, y_offset = calculate_offset(slide_path)
     
     minx_offset = [x - x_offset for x in pred_df["minx"]],
     
@@ -475,7 +477,7 @@ def create_measurement_map(slide_id: str,
     pred_df.insert(3, "miny_offset", miny_offset[0])
     
     # Save the updated csv file
-    pred_df.to_csv(os.path.join(res_dl_dir, f"{slide_id}_withoffset.csv"))
+    pred_df.to_csv(os.path.join(res_dl_dir, f"{slide_no_ext}_withoffset.csv"))
             
     with QuPathProject(project, mode='a') as qp:
         
@@ -488,17 +490,7 @@ def create_measurement_map(slide_id: str,
         
         print(f"Slide being processed: {slide_id}")
         
-        if os.path.isfile(mrxs_path):
-            
-            print(f"File {slide_id}.mrxs already exists.")
-        
-        else:
-            
-            open(mrxs_path, "x").close()
-    
-            print(f"File {slideID}.mrxs is being created.")
-        
-        image = Path(f"{mrxs_path}")
+        image = Path(f"{slide_path}")
         
         # add an image
         entry = qp.add_image(image, image_type=QuPathImageType.BRIGHTFIELD_H_E)
