@@ -141,8 +141,8 @@ def crate_points(score: float,
 
 
 def create_density_map(slide_id: str,
-                       wsidir: str | Path,
                        res_dl_dir: str | Path,
+                       slides_dir: str | Path,
                        output_dir: str | Path,
                        pred_class: str,
                        pred_score: float):
@@ -151,8 +151,8 @@ def create_density_map(slide_id: str,
     This visualization is particularly useful to visualize predictions from MIL models
 
     :param slide_id: slide identifier
-    :param wsidir: full path to the slide in the temporary slides folder
     :param res_dl_dir: full path to the folder where results from the DL model deployment are stored
+    :param slides_dir: full path to the slides archive folder
     :param output_dir: full path to the directory storing the QuPath project
     :param pred_class: class predicted by the DL model
     :param pred_score: prediction score associated with the predicted class
@@ -209,7 +209,7 @@ def create_density_map(slide_id: str,
             
         print(f"Slide being processed: {slide_id}")
         
-        mrxs_path = os.path.join(wsidir, f"{slide_id}.mrxs")
+        mrxs_path = os.path.join(slides_dir, f"{slide_id}.mrxs")
         
         if os.path.isfile(mrxs_path):
             
@@ -261,11 +261,6 @@ def create_density_map(slide_id: str,
                 path_class = class_tile
                 )
 
-        # Update the URI so that the slide within the QuPath project can be opened directly from within the NAS
-        uri_old = image
-        uri_new = Path(rf"{slides_dir}, {slide_id}.mrxs")
-        qp.update_image_paths(uri2uri={uri_old: uri_new})
-
         print(f"Density Heatmap for slide {slide_id} completed!")
     
     print(f"\n\n... Renaming project.qpproj file to {slide_id}-{model}.qpproj")
@@ -295,7 +290,6 @@ def create_classes(df):
 
     
 def create_color_map(slide_id: str,
-                       wsidir: str | Path,
                        res_dl_dir: str | Path,
                        slides_dir: str | Path,
                        output_dir: str | Path):
@@ -303,7 +297,6 @@ def create_color_map(slide_id: str,
     This function implements the color map visualization in QuPath
 
     :param slide_id: slide identifier
-    :param wsidir: full path to the slide in the temporary slides folder
     :param res_dl_dir: full path to the folder where results from the DL model deployment are stored
     :param output_dir: full path to the directory storing the QuPath project
     """
@@ -335,7 +328,7 @@ def create_color_map(slide_id: str,
     
     pred_df = pd.read_csv(filepath)
     
-    mrxs_path = os.path.join(wsidir, f"{slide_id}.mrxs")
+    mrxs_path = os.path.join(slides_dir, f"{slide_id}.mrxs")
     
     x_offset, y_offset = calculate_offset(mrxs_path)
     
@@ -414,11 +407,6 @@ def create_color_map(slide_id: str,
                     }
                 )
 
-        # Update the URI so that the slide within the QuPath project can be opened directly from within the NAS
-        uri_old = image
-        uri_new = Path(rf"{slides_dir}, {slide_id}.mrxs")
-        qp.update_image_paths(uri2uri={uri_old: uri_new})
-
         print(f"Color Map for slide {slide_id} completed!")
     
     print(f"\n\n... Renaming project.qpproj file to {slide_id}-{model}.qpproj")
@@ -429,7 +417,6 @@ def create_color_map(slide_id: str,
 
 
 def create_measurement_map(slide_id: str,
-                       wsidir: str | Path,
                        res_dl_dir: str | Path,
                        slides_dir: str | Path,
                        output_dir: str | Path,
@@ -438,7 +425,6 @@ def create_measurement_map(slide_id: str,
     This function implements the measurement map visualization in QuPath
 
     :param slide_id: slide identifier
-    :param wsidir: full path to the slide in the temporary slides folder
     :param res_dl_dir: full path to the folder where results from the DL model deployment are stored
     :param output_dir: full path to the directory storing the QuPath project
     :param class_names: list containing the names of the classes predicted by the deep-learning model
@@ -476,7 +462,7 @@ def create_measurement_map(slide_id: str,
     
     pred_df = pd.read_csv(filepath)
     
-    mrxs_path = os.path.join(wsidir, f"{slide_id}.mrxs")
+    mrxs_path = os.path.join(slides_dir, f"{slide_id}.mrxs")
     
     x_offset, y_offset = calculate_offset(mrxs_path)
     
@@ -539,11 +525,6 @@ def create_measurement_map(slide_id: str,
                     f"{cl}": measure
                     }
                 )
-    
-        # Update the URI so that the slide within the QuPath project can be opened directly from within the NAS
-        uri_old = image
-        uri_new = Path(rf"{slides_dir}, {slide_id}.mrxs")
-        qp.update_image_paths(uri2uri={uri_old: uri_new})
 
         print(f"Measurement map for slide {slide_id} completed!")
     

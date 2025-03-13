@@ -34,6 +34,12 @@ def run_inference(slide_id : str,
     :param wdir: path to the working directory
     """
 
+    mrxs_path_archive = Path(rf"{slides_archive}/{slide_id}.mrxs")
+    if os.path.isfile(mrxs_path_archive):
+        pass
+    else:
+        open(mrxs_path_archive, "x").close()
+
     # Define the temporary slide directory where to store each new analyzed slide
     tmp_slidedir = Path(rf"{wdir}/tmp_slides/{slide_id}")
 
@@ -56,7 +62,7 @@ def run_inference(slide_id : str,
             open(mrxs_path, "x").close()
             print(rf"File {slide_id}.mrxs is being created.")
     else:
-        # If the folder already exists, it means that the slide has been previously analyzed with other algorithms
+        # If the folder already exists, it means that the slide has been previously analyzed with other algorithms, and thus also the mrxs file exists
         print(f"Slide {slide_id} already exists...Skipping copy of slide under {tmp_slidedir}")
 
     custom_modelsdir = Path(rf"{wdir}/custom_DL_models")
@@ -137,11 +143,11 @@ def run_inference(slide_id : str,
         if visualization == "measurement_map":
             print(f"{Fore.MAGENTA}*" * 100)
             print(f"{Fore.MAGENTA}Creating measurement map for slide: {slide_id}")
-            create_qupath_proj.create_measurement_map(slide_id, tmp_slidedir, model_resdir, slides_archive, qupathdir, class_names)
+            create_qupath_proj.create_measurement_map(slide_id, model_resdir, slides_archive, qupathdir, class_names)
         elif visualization == 'color_map':
             print(f"{Fore.MAGENTA}*" * 100)
             print(f"{Fore.MAGENTA}Creating color map for slide: {slide_id}")
-            create_qupath_proj.create_color_map(slide_id, tmp_slidedir, model_resdir, slides_archive, qupathdir)
+            create_qupath_proj.create_color_map(slide_id, model_resdir, slides_archive, qupathdir)
     else:
         print(f"Toolbox {toolbox} not available")
                 
