@@ -7,7 +7,7 @@ A standardized, open-source framework to integrate both <ins>publicly available<
 ## Updates
 - **Version 0.2.0**: Version 0.2.0 of the integration framework allows to run model inference on multiple proprietary slide formats (i.e., MRXS, SVS, NDPI, TIFF, TIF) with [WSInfer](https://github.com/SBU-BMI/wsinfer). DL model inference results can be visualized in QuPath as measurement maps or as color maps.
 
-- **Version 0.1.0**: Version 0.1.0 of the integration framework allows to run model inference on 3DHistech's proprietary MRXS slide format with [WSInfer](https://github.com/SBU-BMI/wsinfer). DL model inference results can be visualized in QuPath as measurement maps or as color maps.
+- **Version 0.1.0**: Version 0.1.0 of the integration framework allows to run model inference on 3DHistech's proprietary MRXS slide format with [WSInfer](https://github.com/SBU-BMI/wsinfer). DL model inference results can be visualized in QuPath as measurement maps or as color maps. The README associated with this version can be found [here](https://github.com/MiriamAng/IntegrationFramework_APLIS/blob/main/docs/README_v010.md).
 
 > [!NOTE]
 In order to use, in addition to [WSInfer](https://github.com/SBU-BMI/wsinfer), also WSInfer-MIL, now renamed to [SpinPath](https://github.com/SBU-BMI/SpinPath), and [marugoto](https://github.com/KatherLab/marugoto), a customization of their source codes is necessary. Please refer to [our publication](https://www.biorxiv.org/content/10.1101/2024.07.11.603091v1) for detailed information on how the source scripts were modified for the purposes of our integration framework. Furthermore, for marugoto, a customized conda environment with scikit v1.1.1 is required.
