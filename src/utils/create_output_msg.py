@@ -11,6 +11,7 @@ from io import BytesIO
 import os
 import pandas as pd
 from pathlib import Path
+from PIL import Image
 from random import randint
 from openslide import OpenSlide
 
@@ -33,7 +34,6 @@ def generate_msg_ctrl_id(ndigits: int) -> str:
     msg_ctrl_id = str("".join(list_digits))
 
     return msg_ctrl_id
-
 
 
 def encode_file_base64(file_path: str | Path) -> str:
@@ -89,7 +89,7 @@ def top_five_tiles(slidedir : str | Path,
             class_names = class_names.replace(" ", "").split(",")
         else:
             class_names = [class_names]
-            
+
         if len(class_names) == 1:
             pred_colname = f"prob_{class_names[0]}"
         elif len(class_names) == 2:
@@ -97,10 +97,19 @@ def top_five_tiles(slidedir : str | Path,
             
         # Sort the dataframe basing on the values stored in pred_colname
         df_model_res_sorted = df_model_res.sort_values(by=[f'{pred_colname}'], ascending=False)
+
+        df_model_res_sorted = df_model_res_sorted.reset_index()
         
         ntop_prob = [prob for i, prob in enumerate(df_model_res_sorted[f'{pred_colname}'][0:ntop]) if prob > 0.5]
-        
-        # Now the dataframe df_model_res_sorted has been sorted, I can take generate the tiles for the first (len(ntop_prob)) tiles
+
+        # Create a folder where to store the top predicted tiles
+        top_tiles_dir = os.path.dirname(os.path.dirname(csv_model_output))
+        top_tiles_dir = Path(top_tiles_dir, "top_predicted_tiles")
+        # Create the folder if it does not exist
+        top_tiles_dir.mkdir(parents=True, exist_ok=True)
+        print(f"Folder {top_tiles_dir} created to store the top predicted tiles")
+
+        # Now the dataframe df_model_res_sorted has been sorted, I can take the first (len(ntop_prob)) tiles
         for i, _ in enumerate(ntop_prob):
             minx = df_model_res_sorted.loc[i, 'minx']
             miny = df_model_res_sorted.loc[i, 'miny']
@@ -108,7 +117,11 @@ def top_five_tiles(slidedir : str | Path,
             height = df_model_res_sorted.loc[i, 'height']
             patch_im = slide.read_region(location=(minx, miny), level=0, size=(width, height))
             patch_im = patch_im.convert("RGB")
-            
+
+            # Save the top tiles as JPEG images
+            patch_im_pil = patch_im
+            patch_im_pil.save(Path(rf"{top_tiles_dir}/top_tile_{i+1}.jpg"), "JPEG")
+
             # Convert the region to a format suitable for encoding (e.g., JPG)
             buffered = BytesIO()
             patch_im.save(buffered, format="JPEG")
@@ -137,16 +150,16 @@ def create_msh(msg_input_dict, msg_output):
     msg_output.msh.msh_6 = msg_input_dict["MSH"]["MSH_4"]
     msg_output.msh.msh_9 = "OUL^R21"
     # Generate the message control ID
-    msg_output.msh.msh_10 = msgControlId(16)
+    msg_output.msh.msh_10 = generate_msg_ctrl_id(16)
     msg_output.msh.msh_11 = "P"
     msg_output.msh.msh_12 = "2.6"
     
     # Validation
-    try:
-        msg_output.msh.validate()
-        #print("MSH Validated")
-    except Exception as e:
-        print(e)
+    # try:
+    #     msg_output.msh.validate()
+    #     #print("MSH Validated")
+    # except Exception as e:
+    #     print(e)
         
     return msg_output
 
@@ -159,32 +172,35 @@ def create_pid(msg_input, msg_output):
     # All the information related to the patient needs to be provided to the OUL_R21_PATIENT group
     msg_output.add_group("OUL_R21_PATIENT")
     msg_output.OUL_R21_PATIENT.add_segment('PID')
-    msg_output.OUL_R21_PATIENT.pid = msg_input.pid.value # This information will be directly retrieved from the input OML^O33 message
+    # This information will be directly retrieved from the input OML^O33 message
+    msg_output.OUL_R21_PATIENT.pid = msg_input.pid.value
     
     # Validation
-    try:
-        msg_output.OUL_R21_PATIENT.pid.validate()
-        print("PID Validated")
-    except Exception as e:
-        print(e)
+    # try:
+    #     msg_output.OUL_R21_PATIENT.pid.validate()
+    #     print("PID Validated")
+    # except Exception as e:
+    #     print(e)
     
     return msg_output
 
-#------------------------------------------------------------------------------------------------------------------#
-#                                  CREATE THE ORDER GROUP (ORC, OBR, OBX)                                          #
-#------------------------------------------------------------------------------------------------------------------#
-def create_order_group(msg_input_dict, msg_input_dict2, msg_output, obs_ids, value_type, obs_values, obs_id_add, value_type_add, obs_values_add, idx_key = ""):
+
+def create_order_group(msg_input_dict, msg_input_dict2, msg_output, obs_ids, value_type, obs_values, obs_id_add, value_type_add, obs_values_add):
+    """
+    This function creates the order group, i.e., the segments ORC, OBR, and OBX of the output OUL^R21 HL7 message
+    starting from the information stored in the input HL7 message and the results of DL model inference.
+
+    """
+
     order_group = Group("OUL_R21_ORDER_OBSERVATION", validation_level=VALIDATION_LEVEL.TOLERANT)
     
     # Add ORC segment
     order_group.add_segment('ORC')
-    key_orc = "ORC" + f"{idx_key}"
-    order_group.orc = msg_input_dict2[key_orc]
+    order_group.orc = msg_input_dict2["ORC"]
     
     # Add OBR segment
     order_group.add_segment('OBR')
-    key_obr = "OBR" + f"{idx_key}"
-    order_group.obr = msg_input_dict2[key_obr]
+    order_group.obr = msg_input_dict2["OBR"]
     
     # Add multiple OBX segments
     for idx, obs_id in enumerate(obs_ids):
@@ -196,7 +212,7 @@ def create_order_group(msg_input_dict, msg_input_dict2, msg_output, obs_ids, val
         obs_id_field = f"{slidebarcode}^{obs_id}"
         obs_group.obx.obx_3 = obs_id_field
         if os.path.exists(obs_values[idx]):
-            file_base64 = str(encodeFile_base64(obs_values[idx]))
+            file_base64 = str(encode_file_base64(obs_values[idx]))
             obs_group.obx.obx_5 = file_base64
         else:
             obs_group.obx.obx_5 = obs_values[idx]
@@ -221,7 +237,7 @@ def create_order_group(msg_input_dict, msg_input_dict2, msg_output, obs_ids, val
 
     return msg_output
 
-def create_msg(wdir, slide_list, msg_input, msg_input_dict, msg_input_dict2, model_name, list_dup_segments, list_label, list_score):
+def create_msg(wdir, slide_id, msg_input, msg_input_dict, msg_input_dict2, model_name, pred_label, pred_score):
     """
     This function creates an unsolicited laboratory observation (OUL_R21) message that will be provided in output after the run of the DL model. 
     The message will contain parts of the results of the DL model. 
@@ -239,83 +255,61 @@ def create_msg(wdir, slide_list, msg_input, msg_input_dict, msg_input_dict2, mod
     msg_output = Message("OUL_R21", validation_level=VALIDATION_LEVEL.TOLERANT)
 
     # Define the type of results to generate. I will generate the following OBX segments:
-        # 1) the predicted label --> String
-        # 2) the predicted score --> Number
-        # 3) json file with the summary of the run --> encoded in base 64
-        # 3) image of the mask --> encoded in base 64
-        # 4) csv file with the attention scores/prediction for each tile --> encoded in base 64
-
-    for i, slide in enumerate(slide_list):
+        # 1) a json file with the summary of the run --> encoded in base 64
+        # 2) the image of the mask --> encoded in base 64
+        # 3) csv file with the attention scores/prediction for each tile --> encoded in base 64
+        # 4) top 5 predicted tiles for a subset of DL models
         
-        tmp_resdir = Path(f"{wdir}/tmp_results/{slide}/{model_name}")
-        
-        tmp_slidedir = Path(rf"{wdir}/tmp_slides/{slide}/{slide}.mrxs")
-        
-        # The content of the OBX segments will slightly change basing on weather we are running DL model deployment
-        # with patch-level classification models or slide-level classification models.
+    tmp_resdir = Path(f"{wdir}/results_inference/{slide_id}/{model_name}")
 
-        # For slide-level classification models, as those provided by WSInfer-MIL and marugoto, the OBX segmernt will
-        # store the predicted label and the predicted score. Indeed, slide-level classification models provide in output
-        # an overall slide-level prediction.
-        if ('porpoise' in model_name) or ('tp53' in model_name) or ('marugoto' in model_name):
-            obs_ids = ["MODEL", "PRED_LABEL", "PRED_SCORE"] 
-            value_type = ["ST", "ST", "NM"]
-            obs_values = [model_name, list_label[i], str(list_score[i])]
-            obs_id_add = []
-            value_type_add = []
-            obs_values_add = []
-            
-        else:
-            # Returns in output as OBX segments all the output files generated by WSInfer
-            path_to_mask = Path(f"{tmp_resdir}/masks/{slide}.jpg")
+    tmp_slidedir = Path(rf"{wdir}/tmp_slides/{slide_id}/{slide_id}.mrxs")
 
-            path_to_csv = Path(f"{tmp_resdir}/model-outputs-csv/{slide}.csv")
-            
-            # Extract top 5 tiles encoded in base64 only if provided according to model type
-            obs_id_add, value_type_add, obs_values_add = top_five_tiles(tmp_slidedir, path_to_csv, model_name, wdir)
-        
-            # Path to json file
-            for file in os.listdir(tmp_resdir):
-                if file.endswith(".json"):
-                    json_file = file
-            path_to_json = Path(f"{tmp_resdir}/{json_file}")
-            
-            if None in list_label:
-                obs_ids = ["MODEL", "RUN", "MASK", "TABLE"] 
-                value_type = ["ST", "ED", "ED", "ED"]
-                obs_values = [model_name, path_to_json, path_to_mask, path_to_csv]
-            else:
-                obs_ids = ["MODEL", "PRED_LABEL", "PRED_SCORE", "RUN", "MASK", "TABLE"] 
-                value_type = ["ST", "ST", "NM", "ED", "ED", "ED"]
-                obs_values = [model_name, list_label[i], str(list_score[i]), path_to_json, path_to_mask, path_to_csv]
-    
-        # Add to the OUL^R21 message the MSH segment
-        msg_output = create_msh(msg_input_dict, msg_output)
-    
-        # Add to the OUL^R21 message the PID segment
-        msg_output = create_pid(msg_input, msg_output)
-    
-        #------------- Order Observation and Observation Results -------------#
-    
-        if 'ORC' in list_dup_segments:
-            howmany = len([key for key in list(msg_input_dict.keys()) if 'ORC' in key])
-            for j in range(howmany):
-                msg_output = create_order_group(msg_input_dict, msg_input_dict2, msg_output, obs_ids, value_type, obs_values, obs_id_add, value_type_add, obs_values_add, idx_key=f"_{j+1}")
-        else:
-            msg_output = create_order_group(msg_input_dict, msg_input_dict2, msg_output, obs_ids, value_type, obs_values, obs_id_add, value_type_add, obs_values_add, idx_key = "")
-    
-        try:
-            msg_output.OUL_R21_ORDER_OBSERVATION.validate()
-            print("ORDER_OBSERVATION Validated")
-        except Exception as e:
-            print(e)
+    # The content of the OBX segments will slightly change basing on the DL model employed for deployment
+    # (i.e., patch-level classification models/slide-level classification models).
 
-        # Validate the entire message
-        try:
-            msg_output.validate()
-            #print("Message Validated!")
-        except Exception as e:
-            print(e)
+    # Returns in output as OBX segments all the output files generated by WSInfer
+    path_to_mask = Path(f"{tmp_resdir}/masks/{slide_id}.jpg")
+
+    path_to_csv = Path(f"{tmp_resdir}/model-outputs-csv/{slide_id}.csv")
+
+    # Extract top 5 tiles encoded in base64 only if provided according to model type
+    obs_id_add, value_type_add, obs_values_add = top_five_tiles(tmp_slidedir, path_to_csv, model_name, wdir)
+
+    # Path to json file
+    for file in os.listdir(tmp_resdir):
+        if file.endswith(".json"):
+            json_file = file
+    path_to_json = Path(f"{tmp_resdir}/{json_file}")
+
+    if pred_label == None:
+        obs_ids = ["MODEL", "RUN", "MASK", "TABLE"]
+        value_type = ["ST", "ED", "ED", "ED"]
+        obs_values = [model_name, path_to_json, path_to_mask, path_to_csv]
+    else:
+        obs_ids = ["MODEL", "PRED_LABEL", "PRED_SCORE", "RUN", "MASK", "TABLE"]
+        value_type = ["ST", "ST", "NM", "ED", "ED", "ED"]
+        obs_values = [model_name, pred_label, str(pred_score), path_to_json, path_to_mask, path_to_csv]
+
+    # Add to the OUL^R21 message the MSH segment
+    msg_output = create_msh(msg_input_dict, msg_output)
+
+    # Add to the OUL^R21 message the PID segment
+    msg_output = create_pid(msg_input, msg_output)
+
+    msg_output = create_order_group(msg_input_dict, msg_input_dict2, msg_output, obs_ids, value_type, obs_values, obs_id_add, value_type_add, obs_values_add)
+
+    # try:
+    #     msg_output.OUL_R21_ORDER_OBSERVATION.validate()
+    #     print("ORDER_OBSERVATION Validated")
+    # except Exception as e:
+    #     print(e)
+
+    # Validate the entire message
+    # try:
+    #     msg_output.validate()
+    #     #print("Message Validated!")
+    # except Exception as e:
+    #     print(e)
             
     return msg_output
     

@@ -6,6 +6,7 @@ E-Mail: miriam.angeloni@uk-erlangen.de
 """
 
 import os
+import pickle
 import queue
 import socket
 import shutil
@@ -21,16 +22,54 @@ from utils import read_input_msg, create_ack_msg, model_inference, create_output
 # Automatically reset the style to normal after each printing
 init(autoreset=True)
 
-# Define a global queue for storing the input OML^O33 HL7 messages to process
-input_msg_queue = queue.Queue(maxsize=0)
+def save_queue(queue_obj, file_path):
+    """
+    This function saves the queue object containing the input HL7 messages to process as pickle file.
+    In case the server stops working, upon its start the queue is loaded and the input HL7 messages retrieved to be processed.
+    :param queue_obj: the queue object
+    :param file_path: path to the pkl file storing the list of input HL7 messages to process
+    """
+    with open(file_path, 'wb') as f:
+        pickle.dump(list(queue_obj.queue), f)
+
+
+def load_queue(file_path):
+    """
+    :param file_path: path to the pkl file containing the list of input HL7 messages to process
+    :return: the queue containing the input HL7 messages that still need to be processed
+    """
+    # Initialize the variable input_queue to avoid initialization errors
+    input_queue = None
+
+    # If the file path does not exist, create it as empty queue and save it
+    if not file_path.is_file():
+        input_queue = queue.Queue(maxsize=0)
+        print(f"Queue not existing yet, creating it under: {file_path}")
+        save_queue(input_queue, file_path)
+    else:
+        try:
+            with open(file_path, 'rb') as f:
+                input_queue_list = pickle.load(f)
+            input_queue = queue.Queue(maxsize=0)
+            for item in input_queue_list:
+                input_queue.put(item)
+            queue_obj_size = input_queue.qsize()
+            if queue_obj_size == 0:
+                print(f"Found {queue_obj_size} slides to analyze, waiting for incoming input HL7 messages!")
+            else:
+                print(f"Found {queue_obj_size} slides to analyze, proceeding with the analysis of the input HL7 messages!")
+        except Exception as e:
+            print(f"Error in retrieving the queue \n{e}")
+
+    return input_queue
 
 
 def remove_slides(directory, hrs=3):
     """
     This function removes slides older than 3 hours under the temporary slides folder
 
-    :param directory: path to the directory to clean up
-    :param hrs: time, in hours, between one cleaning and another
+    :param directory: path to the directory to clean up, in this case the temporary slides folder
+    :param hrs: time, in hours, between one cleaning process and another one
     """
     now = datetime.now()
     cutoff_time = now - timedelta(hours=hrs)
@@ -46,14 +85,13 @@ def remove_slides(directory, hrs=3):
             pass
 
 
-
 def cleanup_worker(directory: str | Path,
                    sleep_time: int):
     """
     This function defines the worker that will be used in the thread for cleaning up the temporary slides folder
 
-    :param directory: path to the directory to clean up
-    :param sleep_time: time, in hours, between one cleaning and another
+    :param directory: path to the directory to clean up, in this case the temporary slides folder
+    :param sleep_time: time, in hours, between one cleaning process and another one
     """
     while True:
         remove_slides(directory)
@@ -82,7 +120,7 @@ def start_client(address_lis: tuple,
     """
     In client mode, the AI-DSS:
      1) transmits the output OUL^R21 message to the AP-LIS
-     2) and listen for incoming ACK messages from the AP-LIS
+     2) listen for incoming ACK messages from the AP-LIS
 
     :param address_lis: public IP address of the AP-LIS as defined in the main() function
     :param msg: OUL^R21 message to send to the AP-LIS storing results of DL model deployment
@@ -95,7 +133,7 @@ def start_client(address_lis: tuple,
         # Connect to the AP-LIS
         client_socket.connect(address_lis)
 
-        # Transmit the OUL^R21 HL7 message storing results of DL model inference to the AP-LIS
+        # Transmit to the AP-LIS the OUL^R21 HL7 message storing results of DL model inference
         client_socket.sendall(msg)
 
         # Wait for the ACK message from the AP-LIS
@@ -133,7 +171,6 @@ def msg_worker(slides_archive: str | Path,
     :param address_lis: public IP address of the AP-LIS as defined in the main() function
     :param num_retries: maximum number of analysis attempts for a given slide in case of failures
     :param delay_secs: waiting time in seconds before starting a new analysis attempt
-    :return:
     """
 
     while True:
@@ -149,40 +186,70 @@ def msg_worker(slides_archive: str | Path,
 
         # Process the input HL7 message (OML_O33)
         print("Reading Input Message........")
-        cod_model, slide_list, msg_input, msg_input_dict, msg_input_dict2, list_dup_segments = read_input_msg.extract_msg_info(msg)
+
+        try:
+            cod_model, slide_id, msg_input, msg_input_dict, msg_input_dict2 = read_input_msg.extract_msg_info(msg)
+
+        except Exception as e:
+            print(f"Error in extracting info from the input message. \n{e} for message {msg}")
+
+            # Send a negative ACK message to the AP-LIS
+            neg_ack = create_ack_msg.create_message(msg, anyerror=True, errorvalue=e)
+
+            # Transform the negative ACK message in a sequence of bytes
+            neg_ack_out = neg_ack.to_mllp().encode('utf-8')
+
+            # Send the encoded negative ACK HL7 message to the AP-LIS (i.e., the server)
+            start_client(address_lis, neg_ack_out)
+
+            # Mark the HL7 message as processed
+            input_msg_queue.task_done()
+
+            continue
 
         print(f"{Fore.GREEN}*" * 100)
-        print(f"{Fore.GREEN}Started processing message for slide ID: {slide_list[0]}")
+        print(f"{Fore.GREEN}Started processing message for slide ID: {slide_id}")
         print(f"{Fore.GREEN}*" * 100)
 
         # Run model inference
         try:
-            model_name, list_pred_label, list_pred_score = model_inference.run_inference(slide_list, cod_model,
-                                                                                     slides_archive, wdir)
+            model_name, pred_label, pred_score = model_inference.run_inference(slide_id, cod_model,
+                                                                                     slides_archive, wdir, paquo_qupath_dir)
         except Exception as e:
-            print(f"Error processing message. \n{e} for slide ID {slide_list[0]}")
+            print(f"Error processing message. \n{e} for slide ID {slide_id}")
             if retry < num_retries:
                 print(
-                    f"... Retrying to process slide {slide_list[0]} in {delay_secs} seconds: attempt "
+                    f"... Retrying to process slide {slide_id} in {delay_secs} seconds: attempt "
                     f"{retry + 1}\\{num_retries}")
                 time.sleep(delay_secs)
                 input_msg_queue.queue.insert(0, (msg, retry + 1))
                 continue
             else:
-                print(
-                    f"Failed to process slide {slide_list[0]} after {num_retries} attempts... Moving to the next slide")
+                print(f"Failed to process slide {slide_id} after {num_retries} attempts... Sending a negative ACK message and moving to the next slide")
+
+                # Send a negative ACK message to the AP-LIS
+                neg_ack = create_ack_msg.create_message(msg, anyerror=True, errorvalue=e)
+
+                # Transform the negative ACK message in a sequence of bytes
+                neg_ack_out = neg_ack.to_mllp().encode('utf-8')
+
+                # Send the encoded negative ACK HL7 message to the AP-LIS (i.e., the server)
+                start_client(address_lis, neg_ack_out)
+
+                # Mark the HL7 message as processed
                 input_msg_queue.task_done()
+
                 continue
 
         # Create the output OUL^R21 HL7 message
         for _ in tqdm(range(100), desc="Creating Output Message"):
-            oul_r21_msg = create_output_msg.create_msg(wdir, slide_list, msg_input, msg_input_dict,
-                                                             msg_input_dict2, model_name, list_dup_segments,
-                                                             list_pred_label, list_pred_score)
+            oul_r21_msg = create_output_msg.create_msg(wdir, slide_id, msg_input, msg_input_dict,
+                                                             msg_input_dict2, model_name,
+                                                             pred_label, pred_score)
             time.sleep(0.02)
 
         print(f"{Fore.GREEN}*" * 100)
-        print(f"{Fore.GREEN}Finished processing message for slide ID: {slide_list[0]}")
+        print(f"{Fore.GREEN}Finished processing message for slide ID: {slide_id}")
         print(f"{Fore.GREEN}*" * 100)
 
         # Transform the output message in a sequence of bytes
@@ -197,7 +264,7 @@ def msg_worker(slides_archive: str | Path,
 
 
 def store_msg_produce_ack(address_as_server: tuple,
-                          msg_queue: Queue):
+                          msg_queue: queue.Queue):
     """
     This function:
      1) stores in a queue each single OML^O33 HL7 input message received from the AP-LIS
@@ -279,17 +346,18 @@ def store_msg_produce_ack(address_as_server: tuple,
 
 def main():
     """
-    The function defines the main variables necessary for the integration workflow.
+    The function defines the main variables necessary for the integration framework.
     """
-
-    working_dir = Path(os.getcwd())
 
     # Define the slides archive
     slides_dir = Path(rf"{working_dir}", "slides_archive")
 
-    # Define the temporary slides folder where all the slides undergoing model deployment will be temporarily saved and
-    # then deleted
+    # Define the temporary slides folder where all the slides undergoing model deployment will be temporarily stored.
+    # This folder will be cleaned up at regular time intervals as defined by the variable "cleanup_interval_seconds"
     tmp_slides_dir = Path(rf"{working_dir}", "tmp_slides")
+
+    # Create the folder if it does not exist
+    tmp_slides_dir.mkdir(parents=True, exist_ok=True)
 
     folder_to_clean = tmp_slides_dir
 
@@ -298,15 +366,16 @@ def main():
     nmax = 3
     delay = 3  # in seconds
 
-    # Define an IP address and a port as server, i.e., when listening for incoming analysis requests from the AP-LIS
-    hs = socket.gethostbyname(socket.gethostname())
-    ps = 2000 # to be customized by users
+    # Define IP address and port as server, i.e., when listening for incoming analysis requests from the AP-LIS
+    #hs = socket.gethostbyname(socket.gethostname())
+    hs = '127.0.0.1' # need to be changed according to the private IP address of the system where the integration is running
+    ps = 21111 # can be customized by users
     address_as_server = (hs, ps)
 
-    # Define the IP address and the port of the AP-LIS for communication when the AI-DSS acts as a client to send results
+    # Define the public IP address and the port of the AP-LIS for communication when the AI-DSS acts as a client to send results
     # of analysis requests
-    hlis = '0.0.0.0' # need to be changed according to the public IP address of the AP-LIS
-    plis = 3000 # to be customized by users
+    hlis = '127.0.0.1' # need to be changed according to the public IP address of the AP-LIS
+    plis = 17779 # can be customized by users
     address_lis = (hlis, plis)
 
     # Start the message worker thread to process the messages in the queue
@@ -325,4 +394,23 @@ def main():
 
 
 if __name__ == "__main__":
+
+    # Set environmental variable to the location of QuPath installation
+    paquo_qupath_dir = '/path/to/QuPath/QuPath-X.X.X'
+    os.environ["PAQUO_QUPATH_DIR"] = paquo_qupath_dir
+
+    # Define as working directory the current working directory
+    working_dir = Path(os.getcwd())
+
+    # Define a log folder where the queue file will be stored
+    queue_loc = Path(rf"{working_dir}", "log")
+
+    # Create the folder if it does not exist
+    queue_loc.mkdir(parents=True, exist_ok=True)
+
+    # Define the exact path to the pickle file
+    queue_file = Path(queue_loc, "queue_to_analyze.pkl")
+
+    input_msg_queue = load_queue(queue_file)
+
     main()

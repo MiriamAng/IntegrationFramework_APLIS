@@ -29,7 +29,9 @@ def generate_msg_ctrl_id(ndigits: int) -> str:
 
     return msg_ctrl_id
 
-def create_message(hl7_input: str) -> str:
+def create_message(hl7_input: str,
+                   anyerror = False,
+                   errorvalue = None) -> str:
     """
     This function creates an ACK message that will be sent to the AP-LIS once the input OML^O33 HL7 message has
     been received. By default, the function will generate a positive message, i.e., without any errors being raised.
@@ -42,7 +44,9 @@ def create_message(hl7_input: str) -> str:
                  ('ERR', SEGMENTS['ERR'], (0, -1), 'SEG'),))
 
     :param hl7_input: string storing the input OML^O33 HL7 message
-    :return: string storing the ACK message
+    :param anyerror: boolean determining whether the ACK will be a  positive ACK or a negative ACK
+    :param errorvalue: string describing the error occurred
+    :return: a string storing the ACK message
     """
 
     try:
@@ -68,14 +72,24 @@ def create_message(hl7_input: str) -> str:
     # The field MSA_2 contains the message control ID of the message sent by the sending system (AP-LIS).
     # This allows the sending system to associate this response with the correct message.
     ack_msg.msa.msa_2 = msg_input.msh.msh_10.value
-    ack_msg.msa.msa_1 = 'AA'
+
+    if not anyerror:
+        # Positive ACK message
+        ack_msg.msa.msa_1 = 'AA'
+    else:
+        # Negative ACK message
+        ack_msg.msa.msa_1 = 'AE'
+        ack_msg.add_segment('ERR')
+        ack_msg.err.err_1 = f"^^^207&{errorvalue}"
+        ack_msg.err.err_3 = "207"
+        ack_msg.err.err_4 = "E"
 
     # Validate the ACK message
-    try:
-        ack_msg.validate()
-        print("ACK Message Validated!")
-    except Exception as e:
-        pass
-        print(e)
+    # try:
+    #     ack_msg.validate()
+    #     print("ACK Message Validated!")
+    # except Exception as e:
+    #     pass
+    #     print(e)
 
     return ack_msg

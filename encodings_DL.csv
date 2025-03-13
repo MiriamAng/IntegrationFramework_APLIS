@@ -7,8 +7,3 @@ PROSTATE_RESNET34,prostate-tumor-resnet34.tcga-prad,Prostate adenocarcinoma dete
 LYMPHONODE_BRCA_RESNET50,lymphnodes-tiatoolbox-resnet50.patchcamelyon,Lymph node metastasis detection in breast cancer,"nomets, mets","Other, Metastasis",Tiles,measurement_map,wsinfer,Yes
 COLORECTAL_RESNET50,colorectal-tiatoolbox-resnet50.kather100k,Colorectal tissue classification,"background, normal_colon_mucosa, debris, colorectal_adenocarcinoma_epithelium, adipose, mucus, smooth_muscle, cancer_associated_stroma, lymphocytes",//,Tiles,color_map,wsinfer,No
 COLORECTAL_RESNET34,colorectal-resnet34.penn,Colorectal tissue classification,"epithelium, stroma, tumor, necrosis, dysplasia",//,Tiles,color_map,wsinfer,No
-BRAF_QUASAR,braf-attMIL-marugoto,Prediction of BRAF mutation in colorectal cancer,"BRAF mutated, BRAF wild-type","MUT, WT",Feature vectors,//,marugoto,No
-isMSIH_QUASAR,msi-attMIL-marugoto,Prediction of MSI in colorectal cancer,"MSI, non-MSI","MSIH, nonMSIH",Feature vectors,//,marugoto,No
-PANCANCER_TP53,pancancer-tp53-mut.tcga,Pancancer prediction of TP53 mutation,"wildtype, mutant","WT, MUT",Feature vectors,density_map,wsinfer-mil,No
-GBMLGG_SURVIVAL,gbmlgg-survival-porpoise.tcga,Risk score for GBMLGG,"logits-time0, logits-time1, logits-time2, logits-time3","logits-time0, logits-time1, logits-time2, logits-time3",Feature vectors,density_map,wsinfer-mil,No
-KIRP_SURVIVAL,kirp-survival-porpoise.tcga,Risk score for KIRP,"logits-time0, logits-time1, logits-time2, logits-time3","logits-time0, logits-time1, logits-time2, logits-time3",Feature vectors,density_map,wsinfer-mil,No
