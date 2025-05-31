@@ -13,7 +13,7 @@ A standardized, open-source framework to integrate both <ins>publicly available<
 In order to use, in addition to [WSInfer](https://github.com/SBU-BMI/wsinfer), also WSInfer-MIL, now renamed to [SpinPath](https://github.com/SBU-BMI/SpinPath), and [marugoto](https://github.com/KatherLab/marugoto), a customization of their source codes is necessary. Please refer to [our publication](https://www.biorxiv.org/content/10.1101/2024.07.11.603091v1) for detailed information on how the source scripts were modified for the purposes of our integration framework. Furthermore, for marugoto, a customized conda environment with scikit v1.1.1 is required.
 
 ## Reference publication
-If you use our work or parts of it, please cite [our publication](https://www.biorxiv.org/content/10.1101/2024.07.11.603091v1](https://genomemedicine.biomedcentral.com/articles/10.1186/s13073-025-01484-y) in Genome Medicine!
+If you use our work or parts of it, please cite [our publication](https://genomemedicine.biomedcentral.com/articles/10.1186/s13073-025-01484-y) in Genome Medicine!
 
 ## How it works
 The developed integration framework relies on a Python-based server-client architecture to: 
